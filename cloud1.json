@@ -1,0 +1,286 @@
+{
+
+"Parameters": {
+  	"NameOfResource": {
+		"Type" : "CommaDelimitedList",
+		"Default" : "device_data"
+	},
+
+	"Region": {
+		"Type" : "CommaDelimitedList",
+		"Default" : "us-east-2"
+	},
+	"LambdaSaveDeviceInfo": {
+		"Type" : "CommaDelimitedList",
+		"Default" : "save_device_info"
+	},
+	"LambdaGetDeviceData": {
+		"Type" : "CommaDelimitedList",
+		"Default" : "get_device_data"
+	},
+	"NameForRole" : {
+		"Type" : "CommaDelimitedList",
+		"Default" : "newrole"
+	},
+	"NameForS3" : {
+		"Type" : "CommaDelimitedList",
+		"Default" : "example141323"
+	},
+	"NameForApi": {
+		"Type" : "CommaDelimitedList",
+		"Default" : "NEW_api_for_api_web_service"
+	},
+	"NameForStage": {
+		"Type" : "CommaDelimitedList",
+		"Default" : "web-service"
+	},
+	"NameForApiKey": {
+		"Type" : "CommaDelimitedList",
+		"Default" : "ApiKey"
+	},
+	"NameForUsagePlan": {
+		"Type" : "CommaDelimitedList",
+		"Default" : "PlanForService"
+	}
+},
+"Resources":
+	{
+	"RoleForLambda":{
+		"Type": "AWS::IAM::Role",
+
+		"Properties": {
+
+	    "RoleName": { "Fn::Select" : [ "0", {"Ref" : "NameForRole"} ] },
+
+	 	"AssumeRolePolicyDocument": {
+				"Version": "2012-10-17",
+				"Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "lambda.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+            },
+            {
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "apigateway.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+            }
+                   ]
+			},
+		"ManagedPolicyArns" : ["arn:aws:iam::aws:policy/AmazonAPIGatewayInvokeFullAccess","arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole","arn:aws:iam::aws:policy/AmazonS3FullAccess","arn:aws:iam::aws:policy/AWSLambdaExecute"]
+	}
+					},
+
+
+	"SaveDeviceInfo": {
+    "Type": "AWS::Lambda::Function",
+    "Properties": {
+		"FunctionName" : { "Fn::Select" : [ "0", {"Ref" : "LambdaSaveDeviceInfo"} ] },
+        "Code": {
+            "S3Bucket": { "Fn::Select" : [ "0", {"Ref" : "NameForS3"} ] },
+            "S3Key": {"Fn::Join" : ["", [{ "Fn::Select" : [ "0", {"Ref" : "LambdaSaveDeviceInfo"} ] },".zip"]]}
+	},
+        "Role": {
+            "Fn::GetAtt": ["RoleForLambda", "Arn"]
+        },
+        "Handler": {"Fn::Join" : ["", [{ "Fn::Select" : [ "0", {"Ref" : "LambdaSaveDeviceInfo"} ] },".lambda_handler"]]},
+        "Runtime": "python3.8"
+				}
+			},
+
+	"GetDeviceData": {
+		"Type": "AWS::Lambda::Function",
+		"Properties": {
+			"FunctionName" : { "Fn::Select" : [ "0", {"Ref" : "LambdaGetDeviceData"} ] },
+			"Code": {
+				"S3Bucket": { "Fn::Select" : [ "0", {"Ref" : "NameForS3"} ] },
+				"S3Key": {"Fn::Join" : ["", [{ "Fn::Select" : [ "0", {"Ref" : "LambdaGetDeviceData"} ] },".zip"]]}
+			},
+			"Role": {
+				"Fn::GetAtt": ["RoleForLambda", "Arn"]
+			},
+			"Handler": {"Fn::Join" : ["", [{ "Fn::Select" : [ "0", {"Ref" : "LambdaGetDeviceData"} ] },".lambda_handler"]]},
+			"Runtime": "python3.8"
+					}
+				},
+
+
+	"CreateRestAPi":{
+		"Type" : "AWS::ApiGateway::RestApi",
+		"Properties" : {
+			"EndpointConfiguration"	: {
+
+				"Types": ["REGIONAL"]
+
+						              },
+			"Name" : { "Fn::Select" : [ "0", {"Ref" : "NameForApi"} ] }
+		}
+					},
+
+
+	"CreateResource": {
+		"Type": "AWS::ApiGateway::Resource",
+		"Properties": {
+			"RestApiId": {"Ref": "CreateRestAPi"},
+			"ParentId": {"Fn::GetAtt": ["CreateRestAPi", "RootResourceId"]},
+			"PathPart": { "Fn::Select" : [ "0", {"Ref" : "NameOfResource"} ] }
+		}
+				},
+
+	"CreateResourceId": {
+		"Type": "AWS::ApiGateway::Resource",
+		"Properties": {
+			"RestApiId": {"Ref": "CreateRestAPi"},
+			"ParentId": {"Ref": "CreateResource"},
+			"PathPart": "{id}"
+					}
+				},
+
+
+	"CreateMethodForSave":{
+		"Type" : "AWS::ApiGateway::Method",
+		"Properties" : {
+			"AuthorizationType" : "NONE",
+			"ApiKeyRequired" : "True",
+			"HttpMethod" : "POST",
+			"Integration" : {
+				"RequestTemplates" : {
+					"application/json": {"Fn::Join" : ["", ["#set($inputRoot = $input.path('$'))\n","{","\"id\": \"$input.params('id')\"",",\n","\"content\": \"$util.base64Encode($input.body)\"","}\n"]]}},
+
+				"IntegrationHttpMethod" : "POST",
+				"IntegrationResponses" : [ {
+					"ResponseTemplates" : {"application/json" : ""},
+					"StatusCode" : "200"
+									}],
+				"PassthroughBehavior" : "WHEN_NO_TEMPLATES",
+				"Type" : "AWS",
+				"Uri" : {"Fn::Join" : ["",["arn:aws:apigateway:", {"Ref": "AWS::Region"}, ":lambda:path/2015-03-31/functions/", {"Fn::GetAtt": ["SaveDeviceInfo", "Arn"]}, "/invocations"]]}
+			},
+			"MethodResponses" : [ {
+				"ResponseModels" : {"application/json": "Empty"},
+				"StatusCode" : "200"
+				} ],
+			"ResourceId" : {"Ref" : "CreateResourceId"},
+			"RestApiId" : {"Ref" : "CreateRestAPi"}
+			}
+		},
+
+
+	"CreateMethodForGet":{
+		"Type" : "AWS::ApiGateway::Method",
+		"Properties" : {
+			"AuthorizationType" : "NONE",
+			"HttpMethod" : "GET",
+			"Integration" : {
+				"RequestTemplates" : {
+					"application/json": {"Fn::Join" : ["", ["#set($inputRoot = $input.path('$'))\n","{","\"id\": \"$input.params('id')\",\n","\"VersionId\": $input.json('$.VersionId')}"]]}},
+
+				"IntegrationHttpMethod" : "POST",
+				"IntegrationResponses" : [ {
+					"ResponseTemplates" : {"application/json" : ""},
+					"StatusCode" : "200"
+									}],
+				"PassthroughBehavior" : "WHEN_NO_TEMPLATES",
+				"Type" : "AWS",
+				"Uri" : {"Fn::Join" : ["",["arn:aws:apigateway:", {"Ref": "AWS::Region"}, ":lambda:path/2015-03-31/functions/", {"Fn::GetAtt": ["GetDeviceData", "Arn"]}, "/invocations"]]}
+			},
+			"MethodResponses" : [ {
+				"ResponseModels" : {"application/json": "Empty"},
+				"StatusCode" : "200"
+				} ],
+			"ResourceId" : {"Ref" : "CreateResourceId"},
+			"RestApiId" : {"Ref" : "CreateRestAPi"}
+			}
+		},
+
+
+
+	"AddPermissionLambdaForSave":{
+
+		"Type" : "AWS::Lambda::Permission",
+		"Properties" : {
+			"Action" : "lambda:InvokeFunction",
+			"FunctionName" : {
+            "Fn::GetAtt": [
+                "SaveDeviceInfo",
+                "Arn"
+            ]
+        },
+			"Principal" : "apigateway.amazonaws.com",
+			"SourceArn" : {"Fn::Join": ["",["arn:aws:execute-api:", {"Ref": "AWS::Region"}, ":", {"Ref": "AWS::AccountId"}, ":", {"Ref": "CreateRestAPi"}, "/*/POST/",{ "Fn::Select" : [ "0", {"Ref" : "NameOfResource"} ] },"/{id}"]]}
+						}
+
+			},
+
+
+	"AddPermissionLambdaForGet":{
+
+		"Type" : "AWS::Lambda::Permission",
+		"Properties" : {
+			"Action" : "lambda:InvokeFunction",
+			"FunctionName" : {
+            "Fn::GetAtt": [
+                "GetDeviceData",
+                "Arn"
+            ]
+        },
+			"Principal" : "apigateway.amazonaws.com",
+			"SourceArn" : {"Fn::Join": ["",["arn:aws:execute-api:", {"Ref": "AWS::Region"}, ":", {"Ref": "AWS::AccountId"}, ":", {"Ref": "CreateRestAPi"}, "/*/GET/",{ "Fn::Select" : [ "0", {"Ref" : "NameOfResource"} ] },"/{id}"]]}
+						}
+
+			},
+
+
+	"CreateDeployForSave":{
+		"DependsOn": "CreateMethodForSave",
+		"Type" : "AWS::ApiGateway::Deployment",
+		"Properties" : {
+			"RestApiId" : {"Ref": "CreateRestAPi"}
+						}
+				},
+
+
+	"CreateStageForApi" : {
+		"Type" : "AWS::ApiGateway::Stage",
+		"Properties" : {
+			"DeploymentId" : {"Ref" : "CreateDeployForSave"},
+			"RestApiId" : {"Ref" : "CreateRestAPi"},
+			"StageName" : { "Fn::Select" : [ "0", {"Ref" : "NameForStage"} ] }
+		}
+			},
+
+	"CreateApiKey":{
+		"Type" : "AWS::ApiGateway::ApiKey",
+		"Properties" : {
+			"Enabled" : "True",
+			"Name" : { "Fn::Select" : [ "0", {"Ref" : "NameForApiKey"} ] }
+		}
+				},
+
+	"CreateUsagePlan" : {
+		"Type" : "AWS::ApiGateway::UsagePlan",
+		"Properties" : {
+			"ApiStages" : [
+            {
+                "ApiId" : {"Ref" : "CreateRestAPi"},
+                "Stage" : {"Ref" : "CreateStageForApi"}
+            }
+        ],
+			"UsagePlanName" : { "Fn::Select" : [ "0", {"Ref" : "NameForUsagePlan"} ] }
+						}
+				},
+
+	"DeployApiKey" : {
+		"Type" : "AWS::ApiGateway::UsagePlanKey",
+		"Properties" : {
+			"KeyId" : {"Ref" : "CreateApiKey"},
+			"KeyType" : "API_KEY",
+			"UsagePlanId" : {"Ref" : "CreateUsagePlan"}
+			}
+		}
+	}
+}
