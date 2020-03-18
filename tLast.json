@@ -1,0 +1,23 @@
+{
+
+"Resources": {
+
+	"CreateRestAPi":{
+		
+		"Type" : "AWS::ApiGateway::RestApi",
+		"Properties" : {	
+      "EndpointConfiguration" :         {
+            "types":
+                [
+                "REGIONAL",
+                ]
+        },
+      "Name" : "NEW_api_for_web_service"
+					}		
+					}
+}
+}
+
+
+
+"RequestTemplates" : {"application/json": {"Fn::Join" : ["",["#set($inputRoot = $input.path('$'))/n", "{/n", {"id" : "$input.params('id'),/n"}, {"content" :"$util.base64Encode($input.body)/n"} , "}"]]}},
