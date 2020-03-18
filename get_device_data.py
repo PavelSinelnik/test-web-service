@@ -13,4 +13,4 @@ def lambda_handler(event, context):
             return base64.b64decode(botocore.response.StreamingBody.read(a['Body']))
 
 
-    return "Not found! "
+    return "Not found "
