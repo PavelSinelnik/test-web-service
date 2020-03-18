@@ -1,0 +1,97 @@
+{
+"Resources":
+	{
+	"CreateRoleForCodePipeline": {
+		"Type": "AWS::IAM::Role",
+
+		"Properties": {
+		"ManagedPolicyArns" : ["arn:aws:iam::aws:policy/AWSLambdaFullAccess","arn:aws:iam::aws:policy/AmazonS3FullAccess"],
+	    "RoleName": "RoleForCoePipeline",
+
+	 	"AssumeRolePolicyDocument": {
+			"Version": "2012-10-17",
+			"Statement": [
+				{
+					"Effect": "Allow",
+					"Principal": {
+						"Service": "codepipeline.amazonaws.com"
+					},
+					"Action": "sts:AssumeRole"
+				}
+			]
+		}
+		}
+	},
+	"CreateCodePipeline": {
+		"Type": "AWS::CodePipeline::Pipeline",
+
+		"Properties": {
+			"ArtifactStore" : {
+				"Location" : "qqqwwwerrtyy",
+  					"Type" : "S3"
+			},
+			"Name": "pipelinee",
+			"RoleArn": {
+				"Fn::GetAtt": [
+					"CreateRoleForCodePipeline",
+					"Arn"
+				]
+			},
+			"Stages": [
+				{
+					"Name": "stagee",
+					"Actions": [
+						{
+							"ActionTypeId": {
+								"Category": "Source",
+								"Owner": "ThirdParty",
+								"Provider": "GitHub",
+								"Version": "1"
+							},
+							"Name": "Actions",
+							"OutputArtifacts": [{
+                                                "Name": "SourceOutput"
+								}],
+							"Configuration": {
+								"Owner": "pavel11111111111111111111",
+								"Repo": "git-project",
+								"Branch": "master",
+								"OAuthToken": "f109b655a979e9dcfa0f4a361861769c6728ed4d"
+							}
+						}
+					]
+
+				},
+				{
+    "Name": "S33",
+    "Actions": [
+        {
+            "RunOrder": 1,
+
+            "ActionTypeId": {
+                "Provider": "S3",
+                "Owner": "AWS",
+                "Version": "1",
+                "Category": "Deploy"
+            },
+            "Region": "us-east-2",
+            "Name": "S333",
+			"InputArtifacts" : [{"Name" :  "SourceOutput"}],
+            "Configuration": {
+                "BucketName": "forgit",
+                "Extract": "true"
+
+            }
+
+        }
+    ]
+}
+			]
+
+		}
+	}
+	
+	}
+}
+
+
